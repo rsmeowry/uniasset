@@ -1,5 +1,4 @@
 ﻿use crate::data::UnityAssetReference;
-use anyhow::bail;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_yaml_ng::Value;
@@ -9,6 +8,7 @@ use std::io::{Read, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+use crate::{Error, Res};
 
 /// A scope that contains info useful for the project
 ///
@@ -21,7 +21,7 @@ pub struct ProjectScope {
 }
 
 impl ProjectScope {
-    pub fn init<P>(source: P, cfg: ScanConfig) -> anyhow::Result<Self> where P: Into<PathBuf> {
+    pub fn init<P>(source: P, cfg: ScanConfig) -> Res<Self> where P: Into<PathBuf> {
         let mut slf = Self {
             base_dir: source.into(),
             files: HashMap::default(),
@@ -37,7 +37,7 @@ impl ProjectScope {
                 File::open(&entry.path())?.read_to_string(&mut buf)?;
                 let meta = serde_yaml_ng::from_str::<MetaFile>(&buf)?;
                 if meta.file_format_version != 2 {
-                    anyhow::bail!("Invalid file format version encountered: '{}'. Only version 2 is supported at the moment", meta.file_format_version)
+                    return Err(Error::InvalidFormat(meta.file_format_version));
                 }
                 slf.files.insert(meta.guid.into(), entry.path().to_path_buf());
             }
@@ -46,10 +46,10 @@ impl ProjectScope {
         Ok(slf)
     }
 
-    pub fn find_asset_by_guid<A, S>(&self, asset_id: S) -> anyhow::Result<A> where S: AsRef<str>, A: From<UnityAssetReference> {
+    pub fn find_asset_by_guid<A, S>(&self, asset_id: S) -> Res<A> where S: AsRef<str>, A: From<UnityAssetReference> {
         let asset_id_str = asset_id.as_ref();
         if !self.files.contains_key(asset_id_str) {
-            bail!("Couldn't find an asset with GUID {asset_id_str}")
+            return Err(Error::GuidNotFound(asset_id_str.to_string()));
         }
 
         Ok(UnityAssetReference {
@@ -59,7 +59,7 @@ impl ProjectScope {
         }.into())
     }
 
-    pub fn find_asset_by_name<A, S>(&self, asset_name: S) -> anyhow::Result<A> where S: AsRef<str>, A: From<UnityAssetReference> {
+    pub fn find_asset_by_name<A, S>(&self, asset_name: S) -> Res<A> where S: AsRef<str>, A: From<UnityAssetReference> {
         let asset_name_str = asset_name.as_ref();
         let found = self.files
             .iter()
@@ -72,18 +72,17 @@ impl ProjectScope {
                 ty: 0,
             }.into())
         } else {
-            bail!("Couldn't find any assets with name {asset_name_str}")
+            Err(Error::NameNotFound(asset_name_str.to_string()))
         }
-
     }
 
-    pub fn load_scriptable_object<T, P>(&self, path: P) -> anyhow::Result<T> where T: Serialize + DeserializeOwned, P: AsRef<Path> {
+    pub fn load_scriptable_object<T, P>(&self, path: P) -> Res<T> where T: Serialize + DeserializeOwned, P: AsRef<Path> {
         let file = File::open(path)?;
         serde_yaml_ng::from_reader::<File, MonoBehaviourContainer<T>>(file)
-            .map(|v| v.mono).map_err(anyhow::Error::from)
+            .map(|v| v.mono).map_err(crate::Error::from)
     }
 
-    pub fn save_scriptable_object<T, P>(&self, asset_base: T, path: P) -> anyhow::Result<()> where T: Serialize + DeserializeOwned, P: AsRef<Path> {
+    pub fn save_scriptable_object<T, P>(&self, asset_base: T, path: P) -> Res<()> where T: Serialize + DeserializeOwned, P: AsRef<Path> {
         let mut file = File::open(&path)?;
         let mut buf = String::new();
         file.read_to_string(&mut buf)?;
@@ -92,9 +91,9 @@ impl ProjectScope {
 
         let mut base_value = serde_yaml_ng::from_str::<Value>(&buf)?;
 
-        let Value::Mapping(asset_value) = serde_yaml_ng::to_value(asset_base)? else { bail!("Invalid file format") };
+        let Value::Mapping(asset_value) = serde_yaml_ng::to_value(asset_base)? else { return Err(Error::GenericInvalidFormat) };
 
-        let Value::Mapping(mono) = base_value.get_mut("MonoBehaviour").unwrap() else { bail!("Invalid file format") };
+        let Value::Mapping(mono) = base_value.get_mut("MonoBehaviour").unwrap() else { return Err(Error::GenericInvalidFormat) };
 
         for key in asset_value.keys() {
             mono.insert(key.clone(), asset_value.get(key.as_str().unwrap()).unwrap().clone());

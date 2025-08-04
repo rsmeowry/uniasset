@@ -1,22 +1,31 @@
+use thiserror::Error;
+
 pub mod data;
 mod scope;
 
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Failed to perform an IO operation: {0}")]
+    IOError(#[from] std::io::Error),
+    #[error("Failed to deserialize YAML data: {0}")]
+    YamlError(#[from] serde_yaml_ng::Error),
+    #[error("Invalid file format encountered. File format {0} is not supported")]
+    InvalidFormat(u8),
+    #[error("Couldn't find any assets with this GUID {0}")]
+    GuidNotFound(String),
+    #[error("Couldn't find any assets with this name {0}")]
+    NameNotFound(String),
+    #[error("Failed to deserialize asset file")]
+    GenericInvalidFormat,
 }
+
+pub(crate) type Res<T> = Result<T, Error>;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::data::{UnityColor, UnityEnum, UnityMaterial, UnitySprite, UnityTexture2D};
     use crate::scope::{ProjectScope, ScanConfig};
     use serde::{Deserialize, Serialize};
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
 
     #[test]
     fn test_open_project() {
@@ -35,7 +44,7 @@ mod tests {
     #[test]
     fn test_load_scriptable_object() -> anyhow::Result<()> {
         let project = ProjectScope::init(r#"C:\Users\rm\Projects\Jabki\Assets"#, ScanConfig::default())?;
-        let obj: anyhow::Result<DebugScriptable> = project.load_scriptable_object(r#"C:\Users\rm\Projects\Jabki\Assets\Data\New Debug Scriptable Object.asset"#);
+        let obj: crate::Res<DebugScriptable> = project.load_scriptable_object(r#"C:\Users\rm\Projects\Jabki\Assets\Data\New Debug Scriptable Object.asset"#);
 
         assert!(obj.is_ok());
 
