@@ -2,6 +2,7 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::scope::ProjectScope;
 
+/// Represents a reference to a single asset file. Contains file ID that determines asset type, GUID, and the type
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnityAssetReference {
     #[serde(rename = "fileID")]
@@ -11,6 +12,7 @@ pub struct UnityAssetReference {
     pub ty: u8
 }
 
+/// Represents an RGBA color
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnityColor {
     pub r: f32,
@@ -19,26 +21,31 @@ pub struct UnityColor {
     pub a: f32
 }
 
+/// Represents a Unity material
 #[derive(Debug, Clone)]
 pub struct UnityMaterial {
     guid: String
 }
 
+/// Represents a Unity sprite
 #[derive(Debug, Clone)]
 pub struct UnitySprite {
     guid: String
 }
 
+/// Represents a Unity non-2D Texture
 #[derive(Debug, Clone)]
 pub struct UnityTexture {
     guid: String
 }
 
+/// Represents a Unity 2D Texture
 #[derive(Debug, Clone)]
 pub struct UnityTexture2D {
     guid: String
 }
 
+/// Used for storing enums
 #[derive(Debug, Clone)]
 pub struct UnityEnum<E> where E: Into<u8> + From<u8> {
     e: E

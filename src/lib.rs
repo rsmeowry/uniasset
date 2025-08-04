@@ -1,7 +1,10 @@
 use thiserror::Error;
 
+/// Contains all the necessary data formats
 pub mod data;
 mod scope;
+
+pub use scope::*;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -9,8 +12,8 @@ pub enum Error {
     IOError(#[from] std::io::Error),
     #[error("Failed to deserialize YAML data: {0}")]
     YamlError(#[from] serde_yaml_ng::Error),
-    #[error("Invalid file format encountered. File format {0} is not supported")]
-    InvalidFormat(u8),
+    #[error("Invalid file format encountered in file {0}. File format {1} is not supported")]
+    InvalidFormat(String, u8),
     #[error("Couldn't find any assets with this GUID {0}")]
     GuidNotFound(String),
     #[error("Couldn't find any assets with this name {0}")]

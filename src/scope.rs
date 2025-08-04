@@ -16,11 +16,13 @@ use crate::{Error, Res};
 #[derive(Debug, Clone)]
 pub struct ProjectScope {
     base_dir: PathBuf,
-    pub files: HashMap<String, PathBuf>,
+    files: HashMap<String, PathBuf>,
     scan_config: ScanConfig,
 }
 
 impl ProjectScope {
+    /// Initializes a project scope with the provided path leading to the Assets folder, and
+    /// the given scanning config
     pub fn init<P>(source: P, cfg: ScanConfig) -> Res<Self> where P: Into<PathBuf> {
         let mut slf = Self {
             base_dir: source.into(),
@@ -37,7 +39,7 @@ impl ProjectScope {
                 File::open(&entry.path())?.read_to_string(&mut buf)?;
                 let meta = serde_yaml_ng::from_str::<MetaFile>(&buf)?;
                 if meta.file_format_version != 2 {
-                    return Err(Error::InvalidFormat(meta.file_format_version));
+                    return Err(Error::InvalidFormat(path.to_string(), meta.file_format_version));
                 }
                 slf.files.insert(meta.guid.into(), entry.path().to_path_buf());
             }
@@ -46,6 +48,13 @@ impl ProjectScope {
         Ok(slf)
     }
 
+    /// Returns a map that contains all asset file GUIDs along
+    /// with their global paths
+    pub fn all_files(&self) -> &HashMap<String, PathBuf> {
+        &self.files
+    }
+
+    /// Finds an asset by its GUID.
     pub fn find_asset_by_guid<A, S>(&self, asset_id: S) -> Res<A> where S: AsRef<str>, A: From<UnityAssetReference> {
         let asset_id_str = asset_id.as_ref();
         if !self.files.contains_key(asset_id_str) {
@@ -59,6 +68,7 @@ impl ProjectScope {
         }.into())
     }
 
+    /// Finds an asset by its name. Can also contain a file extension
     pub fn find_asset_by_name<A, S>(&self, asset_name: S) -> Res<A> where S: AsRef<str>, A: From<UnityAssetReference> {
         let asset_name_str = asset_name.as_ref();
         let found = self.files
@@ -76,12 +86,14 @@ impl ProjectScope {
         }
     }
 
+    /// Loads a scriptable object located at this global path
     pub fn load_scriptable_object<T, P>(&self, path: P) -> Res<T> where T: Serialize + DeserializeOwned, P: AsRef<Path> {
         let file = File::open(path)?;
         serde_yaml_ng::from_reader::<File, MonoBehaviourContainer<T>>(file)
             .map(|v| v.mono).map_err(crate::Error::from)
     }
 
+    /// Saves a scriptable object to given path
     pub fn save_scriptable_object<T, P>(&self, asset_base: T, path: P) -> Res<()> where T: Serialize + DeserializeOwned, P: AsRef<Path> {
         let mut file = File::open(&path)?;
         let mut buf = String::new();
@@ -117,10 +129,20 @@ struct MonoBehaviourContainer<T> {
     pub mono: T
 }
 
+/// A config for project scope scanner
 #[derive(Debug, Clone)]
 pub struct ScanConfig {
     /// File extensions to only search for, comma separated
     pub extension_filter: String
+}
+
+impl ScanConfig {
+    /// Creates a scan config with the provided filter
+    pub fn with_filter<S>(filter: S) -> Self where S: Into<String> {
+        Self {
+            extension_filter: filter.into()
+        }
+    }
 }
 
 impl Default for ScanConfig {
