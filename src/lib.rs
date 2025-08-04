@@ -8,7 +8,7 @@ pub fn add(left: u64, right: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data::{UnityColor, UnityEnum, UnitySprite, UnityTexture2D};
+    use crate::data::{UnityColor, UnityEnum, UnityMaterial, UnitySprite, UnityTexture2D};
     use crate::scope::{ProjectScope, ScanConfig};
     use serde::{Deserialize, Serialize};
 
@@ -27,7 +27,7 @@ mod tests {
     #[test]
     fn test_load_texture() -> anyhow::Result<()> {
         let project = ProjectScope::init(r#"C:\Users\rm\Projects\Jabki\Assets"#, ScanConfig::default())?;
-        let tex: UnityTexture2D = project.find_asset("9fc5e61e92565b649a2a621367653c24")?;
+        let tex: UnityTexture2D = project.find_asset_by_guid("9fc5e61e92565b649a2a621367653c24")?;
         assert!(tex.as_path(&project).to_str().is_some());
         Ok(())
     }
@@ -49,6 +49,9 @@ mod tests {
 
         obj.long_string_val = "This is an another new value!".into();
         obj.debug_enum_val = UnityEnum::from(DebugEnum::Val2);
+        obj.texture_val = project.find_asset_by_name("coconut_parts.png")?;
+        obj.string_list_val.push("Str".to_string());
+        obj.material_val = project.find_asset_by_name("FresnelGlass.mat")?;
 
         project.save_scriptable_object(obj, r#"C:\Users\rm\Projects\Jabki\Assets\Data\New Debug Scriptable Object.asset"#)?;
 
@@ -57,19 +60,20 @@ mod tests {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(rename_all = "camelCase")]
-    pub struct DebugScriptable {
+    struct DebugScriptable {
         pub texture_val: UnityTexture2D,
         pub float_val: f32,
         pub long_string_val: String,
         pub sprite_val: UnitySprite,
         pub color_val: UnityColor,
         pub debug_enum_val: UnityEnum<DebugEnum>,
-        pub string_list_val: Vec<String>
+        pub string_list_val: Vec<String>,
+        pub material_val: UnityMaterial
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[repr(u8)]
-    pub enum DebugEnum {
+    enum DebugEnum {
         Val1,
         Val2,
         Val3

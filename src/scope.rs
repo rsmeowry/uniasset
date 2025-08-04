@@ -1,14 +1,14 @@
-﻿use std::collections::{BTreeMap, HashMap};
+﻿use crate::data::UnityAssetReference;
+use anyhow::bail;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use serde_yaml_ng::Value;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::ops::Add;
 use std::path::{Path, PathBuf};
-use anyhow::bail;
-use serde::{Deserialize, Serialize};
-use serde::de::DeserializeOwned;
-use serde_yaml_ng::Value;
 use walkdir::WalkDir;
-use crate::data::UnityAssetReference;
 
 /// A scope that contains info useful for the project
 ///
@@ -46,7 +46,7 @@ impl ProjectScope {
         Ok(slf)
     }
 
-    pub fn find_asset<A, S>(&self, asset_id: S) -> anyhow::Result<A> where S: AsRef<str>, A: From<UnityAssetReference> {
+    pub fn find_asset_by_guid<A, S>(&self, asset_id: S) -> anyhow::Result<A> where S: AsRef<str>, A: From<UnityAssetReference> {
         let asset_id_str = asset_id.as_ref();
         if !self.files.contains_key(asset_id_str) {
             bail!("Couldn't find an asset with GUID {asset_id_str}")
@@ -57,6 +57,24 @@ impl ProjectScope {
             guid: String::from(asset_id_str),
             ty: 0,
         }.into())
+    }
+
+    pub fn find_asset_by_name<A, S>(&self, asset_name: S) -> anyhow::Result<A> where S: AsRef<str>, A: From<UnityAssetReference> {
+        let asset_name_str = asset_name.as_ref();
+        let found = self.files
+            .iter()
+            .find(|(_, val)| val.file_name().unwrap().to_str().unwrap().contains(&asset_name_str));
+
+        if let Some(pair) = found {
+            Ok(UnityAssetReference {
+                file_id: 0,
+                guid: pair.0.clone(),
+                ty: 0,
+            }.into())
+        } else {
+            bail!("Couldn't find any assets with name {asset_name_str}")
+        }
+
     }
 
     pub fn load_scriptable_object<T, P>(&self, path: P) -> anyhow::Result<T> where T: Serialize + DeserializeOwned, P: AsRef<Path> {
@@ -109,7 +127,7 @@ pub struct ScanConfig {
 impl Default for ScanConfig {
     fn default() -> Self {
         Self {
-            extension_filter: "png,jpg,hdr,asset".into()
+            extension_filter: "png,jpg,hdr,asset,mat".into()
         }
     }
 }
