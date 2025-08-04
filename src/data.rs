@@ -1,1 +1,3 @@
-﻿mod scriptable;
+﻿mod structures;
+
+pub use structures::*;

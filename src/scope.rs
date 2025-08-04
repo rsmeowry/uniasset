@@ -1,9 +1,14 @@
-﻿use std::collections::HashMap;
+﻿use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::io::Read;
-use std::path::PathBuf;
-use serde::Deserialize;
+use std::io::{Read, Write};
+use std::ops::Add;
+use std::path::{Path, PathBuf};
+use anyhow::bail;
+use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde_yaml_ng::Value;
 use walkdir::WalkDir;
+use crate::data::UnityAssetReference;
 
 /// A scope that contains info useful for the project
 ///
@@ -40,6 +45,59 @@ impl ProjectScope {
 
         Ok(slf)
     }
+
+    pub fn find_asset<A, S>(&self, asset_id: S) -> anyhow::Result<A> where S: AsRef<str>, A: From<UnityAssetReference> {
+        let asset_id_str = asset_id.as_ref();
+        if !self.files.contains_key(asset_id_str) {
+            bail!("Couldn't find an asset with GUID {asset_id_str}")
+        }
+
+        Ok(UnityAssetReference {
+            file_id: 0,
+            guid: String::from(asset_id_str),
+            ty: 0,
+        }.into())
+    }
+
+    pub fn load_scriptable_object<T, P>(&self, path: P) -> anyhow::Result<T> where T: Serialize + DeserializeOwned, P: AsRef<Path> {
+        let file = File::open(path)?;
+        serde_yaml_ng::from_reader::<File, MonoBehaviourContainer<T>>(file)
+            .map(|v| v.mono).map_err(anyhow::Error::from)
+    }
+
+    pub fn save_scriptable_object<T, P>(&self, asset_base: T, path: P) -> anyhow::Result<()> where T: Serialize + DeserializeOwned, P: AsRef<Path> {
+        let mut file = File::open(&path)?;
+        let mut buf = String::new();
+        file.read_to_string(&mut buf)?;
+
+        let header = buf.split("\n").take(3).collect::<Vec<&str>>().join("\n");
+
+        let mut base_value = serde_yaml_ng::from_str::<Value>(&buf)?;
+
+        let Value::Mapping(asset_value) = serde_yaml_ng::to_value(asset_base)? else { bail!("Invalid file format") };
+
+        let Value::Mapping(mono) = base_value.get_mut("MonoBehaviour").unwrap() else { bail!("Invalid file format") };
+
+        for key in asset_value.keys() {
+            mono.insert(key.clone(), asset_value.get(key.as_str().unwrap()).unwrap().clone());
+        }
+
+        let v = serde_yaml_ng::to_string(&base_value)?;
+
+        let final_str = header.add("\n").add(&v);
+
+        let mut final_write = File::create(&path)?;
+
+        final_write.write_all(&final_str.as_bytes())?;
+
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct MonoBehaviourContainer<T> {
+    #[serde(rename = "MonoBehaviour")]
+    pub mono: T
 }
 
 #[derive(Debug, Clone)]
