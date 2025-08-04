@@ -29,6 +29,7 @@ mod tests {
     use crate::data::{UnityColor, UnityEnum, UnityMaterial, UnitySprite, UnityTexture2D};
     use crate::scope::{ProjectScope, ScanConfig};
     use serde::{Deserialize, Serialize};
+    use crate::unity_enum;
 
     #[test]
     fn test_open_project() {
@@ -83,27 +84,12 @@ mod tests {
         pub material_val: UnityMaterial
     }
 
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    #[repr(u8)]
-    enum DebugEnum {
-        Val1,
-        Val2,
-        Val3
-    }
-
-    impl Into<u8> for DebugEnum {
-        fn into(self) -> u8 {
-            self as u8
+    unity_enum! {
+        DebugEnum {
+            Val1 = 0,
+            Val2 = 1,
+            Val3 = 2
         }
     }
 
-    impl From<u8> for DebugEnum {
-        fn from(value: u8) -> Self {
-            match value {
-                0 => Self::Val1,
-                1 => Self::Val2,
-                _ => Self::Val3,
-            }
-        }
-    }
 }

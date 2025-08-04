@@ -127,7 +127,7 @@ macro_rules! impl_bases_for_assets {
 
             impl $asset_ty {
                 pub fn as_path<'a>(&self, scope: &'a ProjectScope) -> PathBuf {
-                    let mut meta_file_path = scope.files.get(&self.guid).unwrap().clone();
+                    let mut meta_file_path = scope.all_files().get(&self.guid).unwrap().clone();
                     meta_file_path.set_extension("");
                     meta_file_path
                 }
@@ -141,4 +141,36 @@ impl_bases_for_assets! {
     UnityTexture2D : 28_00000  : 3;
     UnityMaterial  : 21_00000  : 2;
     UnitySprite    : 213_00000 : 3
+}
+
+#[macro_export]
+macro_rules! unity_enum {
+     (
+         $enum_name:ident {
+             $($var_name:ident = $var_idx:literal),+
+         }
+     ) => {
+            #[derive(Debug, Copy, Clone, serde::Serialize, serde::Deserialize)]
+            #[repr(u8)]
+            pub enum $enum_name {
+                $($var_name = $var_idx),+
+            }
+
+            impl Into<u8> for $enum_name {
+                fn into(self) -> u8 {
+                    self as u8
+                }
+            }
+
+            impl From<u8> for $enum_name {
+                fn from(value: u8) -> Self {
+                    match value {
+                        $(
+                        $var_idx => Self::$var_name
+                        ),+
+                        ,_ => Self::from(0)
+                    }
+                }
+            }
+     };
 }
