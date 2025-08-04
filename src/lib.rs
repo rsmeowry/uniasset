@@ -1,4 +1,4 @@
-#![doc = include!("../README.md")]
+// #![doc = include!("../README.md")]
 use thiserror::Error;
 
 /// Contains all the necessary data formats
