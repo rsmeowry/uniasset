@@ -2,6 +2,12 @@
 name = "uniasset"
 version = "0.8.0"
 edition = "2024"
+license = "MIT"
+documentation = "https://docs.rs/uniasset"
+homepage = "https://github.com/rsmeowry/uniasset"
+repository = "https://github.com/rsmeowry/uniasset"
+description = "Unity ScriptableObject manipulation in Rust"
+categories = ["game-development", "data-structures"]
 
 [dependencies]
 serde = {  version = "1.0.219", features = ["derive"] }
